@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1115" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Gym Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <h1>🏋️ Gym Tracker <span class="level-badge" id="header-level">Lv 1</span></h1>
+  </header>
+
+  <!-- DASHBOARD -->
+  <div id="page-dashboard" class="page active">
+    <div class="card">
+      <div class="card-title">Your Progress</div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-value" id="stat-level">1</div>
+          <div class="stat-label">Level</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-streak">0</div>
+          <div class="stat-label">Day Streak</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-sets">0</div>
+          <div class="stat-label">Total Sets</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-xp">0</div>
+          <div class="stat-label">XP</div>
+        </div>
+      </div>
+      <div class="mt-2">
+        <div class="flex-between">
+          <span class="text-muted" style="font-size:0.8rem">Level progress</span>
+          <span class="text-muted" style="font-size:0.8rem" id="xp-text">0 / 500 XP</span>
+        </div>
+        <div class="xp-bar"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Badges</div>
+      <div class="badges" id="badge-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Recent Sets</div>
+      <div id="recent-sets"></div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div id="page-log" class="page">
+    <div class="card">
+      <div class="card-title">Log a Set</div>
+      <div class="form-group">
+        <label>Exercise</label>
+        <select id="log-exercise"></select>
+      </div>
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="log-date" />
+      </div>
+
+      <div id="strength-fields">
+        <div class="row">
+          <div class="form-group">
+            <label>Weight (kg)</label>
+            <input type="number" id="log-weight" step="0.5" min="0" placeholder="0" />
+          </div>
+          <div class="form-group">
+            <label>Reps</label>
+            <input type="number" id="log-reps" min="1" placeholder="0" />
+          </div>
+        </div>
+      </div>
+
+      <div id="cardio-fields" class="hidden">
+        <div class="row">
+          <div class="form-group">
+            <label>Distance</label>
+            <input type="number" id="log-distance" step="0.1" min="0" placeholder="0" />
+          </div>
+          <div class="form-group">
+            <label>Time (e.g. 0:22:33)</label>
+            <input type="text" id="log-time" placeholder="0:00:00" />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Comment (optional)</label>
+        <input type="text" id="log-comment" placeholder="Felt strong, etc." />
+      </div>
+
+      <button class="btn" id="btn-log">Log Set</button>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div id="page-history" class="page">
+    <div id="history-list"></div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div id="page-progress" class="page">
+    <div class="card">
+      <div class="card-title">Progress Charts</div>
+      <div class="form-group">
+        <label>Exercise</label>
+        <select id="progress-exercise"></select>
+      </div>
+      <div class="form-group">
+        <label>Metric</label>
+        <select id="progress-metric">
+          <option value="maxWeight">Max Weight</option>
+          <option value="volume">Daily Volume</option>
+          <option value="e1rm">Estimated 1RM</option>
+        </select>
+      </div>
+      <div class="chart-container">
+        <canvas id="progress-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXERCISES -->
+  <div id="page-exercises" class="page">
+    <div class="card">
+      <div class="card-title">Add New Exercise</div>
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="new-ex-name" placeholder="e.g. Hack Squat" />
+      </div>
+      <div class="row">
+        <div class="form-group">
+          <label>Category</label>
+          <select id="new-ex-category">
+            <option>Legs</option>
+            <option>Chest</option>
+            <option>Back</option>
+            <option>Shoulders</option>
+            <option>Biceps</option>
+            <option>Triceps</option>
+            <option>Abs</option>
+            <option>Cardio</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <select id="new-ex-type">
+            <option value="strength">Strength</option>
+            <option value="cardio">Cardio / Time</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-secondary" id="btn-add-exercise">Add Exercise</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Your Exercises</div>
+      <div id="exercise-list"></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS (hidden page, accessed via extra nav or we can put import here) -->
+  <div id="page-settings" class="page">
+    <div class="card">
+      <div class="card-title">Import Your FitNotes Data</div>
+      <p class="text-muted mb-2" style="font-size:0.9rem">
+        You can load the data you provided, or upload any FitNotes CSV export.
+      </p>
+      <button class="btn btn-success mb-2" id="btn-load-fitnotes">Load My FitNotes Data (535 sets)</button>
+      <div class="form-group">
+        <label>Or upload FitNotes CSV</label>
+        <input type="file" id="import-csv" accept=".csv" />
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Backup & Restore</div>
+      <button class="btn btn-secondary mb-2" id="btn-export">Export All Data (JSON)</button>
+      <div class="form-group">
+        <label>Import JSON backup</label>
+        <input type="file" id="import-json" accept=".json" />
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Danger Zone</div>
+      <button class="btn btn-danger" id="btn-clear">Clear All Data</button>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-page="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Home
+    </button>
+    <button class="nav-btn" data-page="log">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      Log
+    </button>
+    <button class="nav-btn" data-page="history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      History
+    </button>
+    <button class="nav-btn" data-page="progress">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Charts
+    </button>
+    <button class="nav-btn" data-page="exercises">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h12M6 10h12M6 16h8"/></svg>
+      Exercises
+    </button>
+    <button class="nav-btn" data-page="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      Data
+    </button>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="fitnotes-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
