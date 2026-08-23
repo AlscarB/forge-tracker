@@ -1,5 +1,7 @@
 # Gym Tracker
 
+Version: 0.1
+
 A simple, offline-first gym tracking Progressive Web App with:
 
 - Workout logging (strength + cardio)
