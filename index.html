@@ -61,10 +61,19 @@
   <div id="page-log" class="page">
     <div class="card">
       <div class="card-title">Log a Set</div>
+
+      <div class="form-group">
+        <label>Body Group</label>
+        <select id="log-category">
+          <option value="">All</option>
+        </select>
+      </div>
+
       <div class="form-group">
         <label>Exercise</label>
         <select id="log-exercise"></select>
       </div>
+
       <div class="form-group">
         <label>Date</label>
         <input type="date" id="log-date" />
@@ -107,28 +116,63 @@
 
   <!-- HISTORY -->
   <div id="page-history" class="page">
+    <div class="card mb-2">
+      <div class="form-group" style="margin-bottom:0">
+        <label>Filter by Body Group</label>
+        <select id="history-category">
+          <option value="">All</option>
+        </select>
+      </div>
+    </div>
     <div id="history-list"></div>
   </div>
 
-  <!-- PROGRESS -->
+  <!-- PROGRESS / EXERCISE DETAIL -->
   <div id="page-progress" class="page">
     <div class="card">
-      <div class="card-title">Progress Charts</div>
+      <div class="card-title">Exercise Progress</div>
+
+      <div class="form-group">
+        <label>Body Group</label>
+        <select id="progress-category">
+          <option value="">All</option>
+        </select>
+      </div>
+
       <div class="form-group">
         <label>Exercise</label>
-        <select id="progress-exercise"></select>
+        <select id="progress-exercise">
+          <option value="">Select exercise…</option>
+        </select>
       </div>
+
       <div class="form-group">
         <label>Metric</label>
         <select id="progress-metric">
           <option value="maxWeight">Max Weight</option>
-          <option value="volume">Daily Volume</option>
           <option value="e1rm">Estimated 1RM</option>
+          <option value="maxReps">Max Reps</option>
+          <option value="sessionVolume">Session Volume</option>
+          <option value="sessionReps">Session Total Reps</option>
+          <option value="maxWeightAtReps">Max Weight @ ≥8 reps</option>
         </select>
       </div>
+
       <div class="chart-container">
         <canvas id="progress-chart"></canvas>
       </div>
+    </div>
+
+    <!-- PRs for selected exercise -->
+    <div class="card" id="pr-card" style="display:none">
+      <div class="card-title">Personal Records</div>
+      <div id="pr-list"></div>
+    </div>
+
+    <!-- History for selected exercise -->
+    <div class="card" id="ex-history-card" style="display:none">
+      <div class="card-title">Exercise History</div>
+      <div id="ex-history-list"></div>
     </div>
   </div>
 
@@ -142,7 +186,7 @@
       </div>
       <div class="row">
         <div class="form-group">
-          <label>Category</label>
+          <label>Body Group / Category</label>
           <select id="new-ex-category">
             <option>Legs</option>
             <option>Chest</option>
@@ -167,12 +211,17 @@
     </div>
 
     <div class="card">
-      <div class="card-title">Your Exercises</div>
+      <div class="card-title">Exercises by Body Group</div>
+      <div class="form-group">
+        <select id="exercises-filter-category">
+          <option value="">All</option>
+        </select>
+      </div>
       <div id="exercise-list"></div>
     </div>
   </div>
 
-  <!-- SETTINGS (hidden page, accessed via extra nav or we can put import here) -->
+  <!-- SETTINGS -->
   <div id="page-settings" class="page">
     <div class="card">
       <div class="card-title">Import Your FitNotes Data</div>

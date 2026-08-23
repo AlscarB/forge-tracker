@@ -39,7 +39,6 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       state = JSON.parse(raw);
-      // ensure arrays exist
       state.exercises = state.exercises || [];
       state.sets = state.sets || [];
       state.badges = state.badges || [];
@@ -61,12 +60,67 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
+// ===================== HELPERS =====================
+function getExercise(idOrName) {
+  return state.exercises.find(e => e.id === idOrName || e.name === idOrName);
+}
+
+function volumeOf(set) {
+  if (set.weight && set.reps) return set.weight * set.reps;
+  return 0;
+}
+
+function formatDate(d) {
+  const dt = new Date(d + 'T12:00:00');
+  return dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function getCategories() {
+  const cats = [...new Set(state.exercises.map(e => e.category))].sort();
+  return cats;
+}
+
+function populateCategorySelects() {
+  const cats = getCategories();
+  const options = '<option value="">All</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+
+  ['log-category', 'progress-category', 'history-category', 'exercises-filter-category'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      const current = el.value;
+      el.innerHTML = options;
+      if (current && cats.includes(current)) el.value = current;
+    }
+  });
+}
+
+function getExercisesByCategory(category) {
+  if (!category) return [...state.exercises].sort((a, b) => a.name.localeCompare(b.name));
+  return state.exercises
+    .filter(e => e.category === category)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Estimated 1RM (Epley formula)
+function e1rm(weight, reps) {
+  if (!weight || !reps) return 0;
+  if (reps === 1) return weight;
+  return Math.round(weight * (1 + reps / 30));
+}
+
 // ===================== GAMIFICATION =====================
 function calcXP(set) {
   if (set.weight && set.reps) {
-    return Math.round((set.weight * set.reps) / 8); // ~volume based
+    return Math.round((set.weight * set.reps) / 8);
   }
-  if (set.time) return 30; // cardio/time based flat
+  if (set.time) return 30;
   return 10;
 }
 
@@ -92,7 +146,6 @@ function updateStreak() {
     const diff = Math.floor((new Date(today) - last) / 86400000);
     if (diff === 1) state.streak++;
     else if (diff > 1) state.streak = 1;
-    // same day = no change
   }
   state.lastWorkoutDate = today;
 }
@@ -104,7 +157,6 @@ function checkBadges() {
   if (state.level >= 5) badges.add('level5');
   if (state.sets.length >= 50) badges.add('sets50');
   if (state.sets.length >= 200) badges.add('sets200');
-  // PR badges handled on log
   state.badges = [...badges];
 }
 
@@ -117,34 +169,13 @@ const BADGE_INFO = {
   firstPR: { icon: '🏆', name: 'First PR' }
 };
 
-// ===================== HELPERS =====================
-function getExercise(idOrName) {
-  return state.exercises.find(e => e.id === idOrName || e.name === idOrName);
-}
-
-function volumeOf(set) {
-  if (set.weight && set.reps) return set.weight * set.reps;
-  return 0;
-}
-
-function formatDate(d) {
-  const dt = new Date(d + 'T12:00:00');
-  return dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2600);
-}
-
 // ===================== NAV =====================
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   document.querySelector(`[data-page="${name}"]`)?.classList.add('active');
+
   if (name === 'dashboard') renderDashboard();
   if (name === 'history') renderHistory();
   if (name === 'progress') renderProgressPage();
@@ -165,7 +196,6 @@ function renderDashboard() {
   document.getElementById('xp-fill').style.width = Math.min(100, (state.xp / needed) * 100) + '%';
   document.getElementById('xp-text').textContent = `${state.xp} / ${needed} XP`;
 
-  // Recent
   const recent = [...state.sets].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
   const cont = document.getElementById('recent-sets');
   if (recent.length === 0) {
@@ -185,7 +215,6 @@ function renderDashboard() {
     }).join('');
   }
 
-  // Badges
   const badgeCont = document.getElementById('badge-list');
   badgeCont.innerHTML = Object.entries(BADGE_INFO).map(([id, info]) => {
     const earned = state.badges.includes(id);
@@ -195,15 +224,24 @@ function renderDashboard() {
 
 // ===================== LOG =====================
 function prepareLogForm() {
-  const sel = document.getElementById('log-exercise');
-  sel.innerHTML = state.exercises
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map(e => `<option value="${e.id}">${e.name} (${e.category})</option>`)
-    .join('');
+  populateCategorySelects();
+  updateLogExerciseList();
   document.getElementById('log-date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('log-weight').value = '';
   document.getElementById('log-reps').value = '';
   document.getElementById('log-comment').value = '';
+  document.getElementById('log-distance').value = '';
+  document.getElementById('log-time').value = '';
+  toggleLogFields();
+}
+
+function updateLogExerciseList() {
+  const cat = document.getElementById('log-category').value;
+  const list = getExercisesByCategory(cat);
+  const sel = document.getElementById('log-exercise');
+  const prev = sel.value;
+  sel.innerHTML = list.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+  if (prev && list.some(e => e.id === prev)) sel.value = prev;
   toggleLogFields();
 }
 
@@ -244,16 +282,13 @@ function logSet() {
     volume: weight && reps ? weight * reps : 0
   };
 
-  // Check PR
   let isPR = false;
   if (weight && reps) {
     const prev = state.sets.filter(s => s.exerciseId === exerciseId && s.weight);
     const maxW = prev.reduce((m, s) => Math.max(m, s.weight || 0), 0);
     if (weight > maxW) {
       isPR = true;
-      if (!state.badges.includes('firstPR')) {
-        state.badges.push('firstPR');
-      }
+      if (!state.badges.includes('firstPR')) state.badges.push('firstPR');
     }
   }
 
@@ -264,20 +299,27 @@ function logSet() {
 
   showToast(isPR ? `🏆 New PR! +${xpGained} XP` : `Set logged! +${xpGained} XP`);
   prepareLogForm();
-  // stay on log page for multiple sets
 }
 
 // ===================== HISTORY =====================
 function renderHistory() {
+  populateCategorySelects();
+  const catFilter = document.getElementById('history-category').value;
   const cont = document.getElementById('history-list');
-  if (state.sets.length === 0) {
+
+  let sets = state.sets;
+  if (catFilter) {
+    const exIds = new Set(state.exercises.filter(e => e.category === catFilter).map(e => e.id));
+    sets = sets.filter(s => exIds.has(s.exerciseId));
+  }
+
+  if (sets.length === 0) {
     cont.innerHTML = '<div class="empty">No history yet</div>';
     return;
   }
 
-  // group by date
   const byDate = {};
-  state.sets.forEach(s => {
+  sets.forEach(s => {
     if (!byDate[s.date]) byDate[s.date] = [];
     byDate[s.date].push(s);
   });
@@ -285,14 +327,14 @@ function renderHistory() {
   const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
 
   cont.innerHTML = dates.map(date => {
-    const sets = byDate[date];
-    const totalVol = sets.reduce((sum, s) => sum + (s.volume || 0), 0);
+    const daySets = byDate[date];
+    const totalVol = daySets.reduce((sum, s) => sum + (s.volume || 0), 0);
     return `<div class="workout-day">
       <div class="day-header">
         <span>${formatDate(date)}</span>
-        <span class="text-muted">${sets.length} sets${totalVol ? ' · ' + Math.round(totalVol) + ' kg vol' : ''}</span>
+        <span class="text-muted">${daySets.length} sets${totalVol ? ' · ' + Math.round(totalVol) + ' kg vol' : ''}</span>
       </div>
-      ${sets.map(s => {
+      ${daySets.map(s => {
         const ex = getExercise(s.exerciseId);
         const name = ex ? ex.name : s.exerciseName || 'Unknown';
         let detail = '';
@@ -316,13 +358,61 @@ function renderHistory() {
 let progressChart = null;
 
 function renderProgressPage() {
+  populateCategorySelects();
+  updateProgressExerciseList();
+  // hide detail cards until exercise selected
+  document.getElementById('pr-card').style.display = 'none';
+  document.getElementById('ex-history-card').style.display = 'none';
+  if (progressChart) {
+    progressChart.destroy();
+    progressChart = null;
+  }
+}
+
+function updateProgressExerciseList() {
+  const cat = document.getElementById('progress-category').value;
+  const list = getExercisesByCategory(cat).filter(e => e.type === 'strength');
   const sel = document.getElementById('progress-exercise');
+  const prev = sel.value;
   sel.innerHTML = '<option value="">Select exercise…</option>' +
-    state.exercises
-      .filter(e => e.type === 'strength')
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map(e => `<option value="${e.id}">${e.name}</option>`)
-      .join('');
+    list.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+  if (prev && list.some(e => e.id === prev)) {
+    sel.value = prev;
+    updateChart();
+  }
+}
+
+function getSessionAggregates(exerciseId) {
+  // Group sets by date for this exercise → one "session" per day
+  const relevant = state.sets
+    .filter(s => s.exerciseId === exerciseId && s.weight && s.reps)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const byDate = {};
+  relevant.forEach(s => {
+    if (!byDate[s.date]) {
+      byDate[s.date] = {
+        date: s.date,
+        maxWeight: 0,
+        maxReps: 0,
+        volume: 0,
+        totalReps: 0,
+        sets: [],
+        bestE1rm: 0,
+        maxWeightAt8: 0   // max weight where reps >= 8
+      };
+    }
+    const d = byDate[s.date];
+    d.maxWeight = Math.max(d.maxWeight, s.weight);
+    d.maxReps = Math.max(d.maxReps, s.reps);
+    d.volume += s.volume;
+    d.totalReps += s.reps;
+    d.sets.push(s);
+    d.bestE1rm = Math.max(d.bestE1rm, e1rm(s.weight, s.reps));
+    if (s.reps >= 8) d.maxWeightAt8 = Math.max(d.maxWeightAt8, s.weight);
+  });
+
+  return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function updateChart() {
@@ -335,52 +425,64 @@ function updateChart() {
     progressChart = null;
   }
 
-  if (!exerciseId) return;
-
-  const relevant = state.sets
-    .filter(s => s.exerciseId === exerciseId && s.weight && s.reps)
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  if (relevant.length === 0) {
-    showToast('No strength data for this exercise yet');
+  if (!exerciseId) {
+    document.getElementById('pr-card').style.display = 'none';
+    document.getElementById('ex-history-card').style.display = 'none';
     return;
   }
 
-  // Aggregate by date (max weight or total volume that day)
-  const byDate = {};
-  relevant.forEach(s => {
-    if (!byDate[s.date]) byDate[s.date] = { maxWeight: 0, volume: 0, maxReps: 0 };
-    byDate[s.date].maxWeight = Math.max(byDate[s.date].maxWeight, s.weight);
-    byDate[s.date].volume += s.volume;
-    byDate[s.date].maxReps = Math.max(byDate[s.date].maxReps, s.reps);
-  });
+  const sessions = getSessionAggregates(exerciseId);
+  if (sessions.length === 0) {
+    showToast('No strength data for this exercise yet');
+    document.getElementById('pr-card').style.display = 'none';
+    document.getElementById('ex-history-card').style.display = 'none';
+    return;
+  }
 
-  const labels = Object.keys(byDate).sort();
+  const labels = sessions.map(s => s.date.slice(5)); // MM-DD
   let data, label, color;
 
-  if (metric === 'maxWeight') {
-    data = labels.map(d => byDate[d].maxWeight);
-    label = 'Max Weight (kg)';
-    color = '#3b82f6';
-  } else if (metric === 'volume') {
-    data = labels.map(d => Math.round(byDate[d].volume));
-    label = 'Daily Volume (kg)';
-    color = '#8b5cf6';
-  } else {
-    // estimated 1RM (Epley)
-    data = labels.map(d => {
-      const w = byDate[d].maxWeight;
-      const r = byDate[d].maxReps;
-      return Math.round(w * (1 + r / 30));
-    });
-    label = 'Est. 1RM (kg)';
-    color = '#22c55e';
+  switch (metric) {
+    case 'maxWeight':
+      data = sessions.map(s => s.maxWeight);
+      label = 'Max Weight (kg)';
+      color = '#3b82f6';
+      break;
+    case 'e1rm':
+      data = sessions.map(s => s.bestE1rm);
+      label = 'Estimated 1RM (kg)';
+      color = '#22c55e';
+      break;
+    case 'maxReps':
+      data = sessions.map(s => s.maxReps);
+      label = 'Max Reps';
+      color = '#f59e0b';
+      break;
+    case 'sessionVolume':
+      data = sessions.map(s => Math.round(s.volume));
+      label = 'Session Volume (kg)';
+      color = '#8b5cf6';
+      break;
+    case 'sessionReps':
+      data = sessions.map(s => s.totalReps);
+      label = 'Session Total Reps';
+      color = '#ec4899';
+      break;
+    case 'maxWeightAtReps':
+      data = sessions.map(s => s.maxWeightAt8 || null);
+      label = 'Max Weight @ ≥8 reps (kg)';
+      color = '#06b6d4';
+      break;
+    default:
+      data = sessions.map(s => s.maxWeight);
+      label = 'Max Weight (kg)';
+      color = '#3b82f6';
   }
 
   progressChart = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: labels.map(d => d.slice(5)), // MM-DD
+      labels,
       datasets: [{
         label,
         data,
@@ -389,7 +491,8 @@ function updateChart() {
         fill: true,
         tension: 0.3,
         pointRadius: 4,
-        pointHoverRadius: 6
+        pointHoverRadius: 6,
+        spanGaps: true
       }]
     },
     options: {
@@ -399,7 +502,7 @@ function updateChart() {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: (items) => labels[items[0].dataIndex]
+            title: (items) => sessions[items[0].dataIndex].date
           }
         }
       },
@@ -416,22 +519,102 @@ function updateChart() {
       }
     }
   });
+
+  // Render PRs + history for this exercise
+  renderExerciseDetails(exerciseId, sessions);
+}
+
+function renderExerciseDetails(exerciseId, sessions) {
+  const ex = getExercise(exerciseId);
+  const prCard = document.getElementById('pr-card');
+  const histCard = document.getElementById('ex-history-card');
+  prCard.style.display = 'block';
+  histCard.style.display = 'block';
+
+  // Calculate lifetime PRs
+  let allTimeMaxWeight = 0;
+  let allTimeMaxVolume = 0;
+  let allTimeBestE1rm = 0;
+  let allTimeMaxReps = 0;
+  let bestWeightAt8 = 0;
+  let prDateWeight = '', prDateVol = '', prDateE1rm = '';
+
+  sessions.forEach(s => {
+    if (s.maxWeight > allTimeMaxWeight) {
+      allTimeMaxWeight = s.maxWeight;
+      prDateWeight = s.date;
+    }
+    if (s.volume > allTimeMaxVolume) {
+      allTimeMaxVolume = s.volume;
+      prDateVol = s.date;
+    }
+    if (s.bestE1rm > allTimeBestE1rm) {
+      allTimeBestE1rm = s.bestE1rm;
+      prDateE1rm = s.date;
+    }
+    allTimeMaxReps = Math.max(allTimeMaxReps, s.maxReps);
+    bestWeightAt8 = Math.max(bestWeightAt8, s.maxWeightAt8 || 0);
+  });
+
+  document.getElementById('pr-list').innerHTML = `
+    <div class="set-item"><div>Max Weight</div><div class="pr">${allTimeMaxWeight} kg <span class="text-muted">(${prDateWeight})</span></div></div>
+    <div class="set-item"><div>Best Est. 1RM</div><div class="pr">${allTimeBestE1rm} kg <span class="text-muted">(${prDateE1rm})</span></div></div>
+    <div class="set-item"><div>Best Session Volume</div><div class="pr">${Math.round(allTimeMaxVolume)} kg <span class="text-muted">(${prDateVol})</span></div></div>
+    <div class="set-item"><div>Max Reps (any set)</div><div class="pr">${allTimeMaxReps}</div></div>
+    <div class="set-item"><div>Max Weight @ ≥8 reps</div><div class="pr">${bestWeightAt8 || '—'} kg</div></div>
+  `;
+
+  // Recent history (last 8 sessions)
+  const recentSessions = [...sessions].reverse().slice(0, 8);
+  document.getElementById('ex-history-list').innerHTML = recentSessions.map(s => {
+    const setSummary = s.sets.map(set => `${set.weight}×${set.reps}`).join(', ');
+    return `<div class="set-item">
+      <div>
+        <span class="exercise-name">${formatDate(s.date)}</span><br>
+        <span class="set-details">${setSummary}</span>
+      </div>
+      <div class="set-details" style="text-align:right">
+        Vol ${Math.round(s.volume)} kg<br>
+        Max ${s.maxWeight} kg
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ===================== EXERCISES =====================
 function renderExercises() {
+  populateCategorySelects();
+  const catFilter = document.getElementById('exercises-filter-category').value;
   const cont = document.getElementById('exercise-list');
-  const sorted = [...state.exercises].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
-  cont.innerHTML = sorted.map(e => `
-    <div class="exercise-item">
-      <div>
-        <strong>${e.name}</strong>
-        <span class="category-tag">${e.category}</span>
-        <div class="text-muted" style="font-size:0.75rem">${e.type}</div>
+  let list = getExercisesByCategory(catFilter);
+
+  // Group by category for nicer display when "All"
+  if (!catFilter) {
+    const byCat = {};
+    list.forEach(e => {
+      if (!byCat[e.category]) byCat[e.category] = [];
+      byCat[e.category].push(e);
+    });
+    cont.innerHTML = Object.keys(byCat).sort().map(cat => `
+      <div style="margin-bottom:14px">
+        <div class="card-title" style="margin-bottom:6px">${cat}</div>
+        ${byCat[cat].map(e => exerciseItemHtml(e)).join('')}
       </div>
-      <button class="btn btn-sm btn-secondary" onclick="deleteExercise('${e.id}')">Delete</button>
+    `).join('');
+  } else {
+    cont.innerHTML = list.map(e => exerciseItemHtml(e)).join('');
+  }
+}
+
+function exerciseItemHtml(e) {
+  return `<div class="exercise-item">
+    <div>
+      <strong>${e.name}</strong>
+      <span class="category-tag">${e.category}</span>
+      <div class="text-muted" style="font-size:0.75rem">${e.type}</div>
     </div>
-  `).join('');
+    <button class="btn btn-sm btn-secondary" onclick="deleteExercise('${e.id}')">Delete</button>
+  </div>`;
 }
 
 function addExercise() {
@@ -454,6 +637,7 @@ function addExercise() {
   });
   saveState();
   document.getElementById('new-ex-name').value = '';
+  populateCategorySelects();
   renderExercises();
   showToast('Exercise added');
 }
@@ -462,6 +646,7 @@ function deleteExercise(id) {
   if (!confirm('Delete this exercise? Existing sets will keep the name but lose the link.')) return;
   state.exercises = state.exercises.filter(e => e.id !== id);
   saveState();
+  populateCategorySelects();
   renderExercises();
 }
 
@@ -517,12 +702,10 @@ function importFitNotesCSV(file) {
     const cIdx = headers.indexOf('Comment');
 
     let added = 0;
-    const exerciseMap = {}; // name -> id
-
+    const exerciseMap = {};
     state.exercises.forEach(e => { exerciseMap[e.name.toLowerCase()] = e.id; });
 
     for (let i = 1; i < lines.length; i++) {
-      // simple CSV split (handles quoted comments)
       const cols = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || lines[i].split(',');
       const get = (idx) => {
         if (idx < 0 || idx >= cols.length) return '';
@@ -536,8 +719,7 @@ function importFitNotesCSV(file) {
 
       let exerciseId = exerciseMap[name.toLowerCase()];
       if (!exerciseId) {
-        // auto-add exercise
-        const type = (category === 'Cardio' || name.toLowerCase().includes('bike') || name.toLowerCase().includes('run') || name.toLowerCase().includes('elliptical') || name.toLowerCase().includes('pilates') || name.toLowerCase().includes('basketball')) ? 'cardio' : 'strength';
+        const type = (category === 'Cardio' || /bike|run|elliptical|pilates|basketball/i.test(name)) ? 'cardio' : 'strength';
         exerciseId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
         state.exercises.push({ id: exerciseId, name, category, type });
         exerciseMap[name.toLowerCase()] = exerciseId;
@@ -565,34 +747,23 @@ function importFitNotesCSV(file) {
       added++;
     }
 
-    // recalculate basic stats
-    state.xp = state.sets.reduce((sum, s) => sum + calcXP(s), 0);
-    state.level = 1;
-    while (state.xp >= state.level * 500) {
-      state.xp -= state.level * 500;
-      state.level++;
-    }
+    state.xp = Math.min(state.sets.reduce((sum, s) => sum + calcXP(s), 0), 8000);
+    state.level = Math.max(1, Math.floor(state.xp / 450) + 1);
     checkBadges();
     saveState();
+    populateCategorySelects();
     showToast(`Imported ${added} sets from FitNotes!`);
     showPage('dashboard');
   };
   reader.readAsText(file);
 }
 
-// Load the pre-parsed FitNotes data that was prepared
-async function loadProvidedFitNotes() {
+function loadProvidedFitNotes() {
   if (!confirm('This will add ~535 sets from your FitNotes export into the app (existing data stays). Continue?')) return;
-  try {
-    // We embed a minimal version or fetch if served, but for static we can use a global
-    if (window.FITNOTES_DATA) {
-      processFitNotesArray(window.FITNOTES_DATA);
-    } else {
-      showToast('Data not embedded. Use the CSV import button instead.');
-    }
-  } catch (e) {
-    showToast('Failed to load data');
-    console.error(e);
+  if (window.FITNOTES_DATA) {
+    processFitNotesArray(window.FITNOTES_DATA);
+  } else {
+    showToast('Data not embedded. Use the CSV import button instead.');
   }
 }
 
@@ -627,11 +798,11 @@ function processFitNotesArray(arr) {
     added++;
   });
 
-  // rough XP recalc
-  state.xp = Math.min(state.sets.reduce((s, x) => s + calcXP(x), 0), 5000);
-  state.level = Math.max(1, Math.floor(state.xp / 400) + 1);
+  state.xp = Math.min(state.sets.reduce((s, x) => s + calcXP(x), 0), 8000);
+  state.level = Math.max(1, Math.floor(state.xp / 450) + 1);
   checkBadges();
   saveState();
+  populateCategorySelects();
   showToast(`Loaded ${added} sets from your FitNotes data!`);
   showPage('dashboard');
 }
@@ -639,19 +810,31 @@ function processFitNotesArray(arr) {
 // ===================== INIT =====================
 document.addEventListener('DOMContentLoaded', () => {
   loadState();
+  populateCategorySelects();
   showPage('dashboard');
 
-  // Nav
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => showPage(btn.dataset.page));
   });
 
+  // Log page
+  document.getElementById('log-category').addEventListener('change', updateLogExerciseList);
   document.getElementById('log-exercise').addEventListener('change', toggleLogFields);
   document.getElementById('btn-log').addEventListener('click', logSet);
-  document.getElementById('btn-add-exercise').addEventListener('click', addExercise);
+
+  // History filter
+  document.getElementById('history-category').addEventListener('change', renderHistory);
+
+  // Progress
+  document.getElementById('progress-category').addEventListener('change', updateProgressExerciseList);
   document.getElementById('progress-exercise').addEventListener('change', updateChart);
   document.getElementById('progress-metric').addEventListener('change', updateChart);
 
+  // Exercises
+  document.getElementById('btn-add-exercise').addEventListener('click', addExercise);
+  document.getElementById('exercises-filter-category').addEventListener('change', renderExercises);
+
+  // Data
   document.getElementById('btn-export').addEventListener('click', exportData);
   document.getElementById('import-json').addEventListener('change', e => {
     if (e.target.files[0]) importJSON(e.target.files[0]);
@@ -666,6 +849,7 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.removeItem(STORAGE_KEY);
       state = { exercises: [...DEFAULT_EXERCISES], sets: [], xp: 0, level: 1, streak: 0, lastWorkoutDate: null, badges: [] };
       saveState();
+      populateCategorySelects();
       showToast('Data cleared');
       showPage('dashboard');
     }
