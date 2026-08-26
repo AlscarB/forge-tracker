@@ -1,3 +1,5 @@
+This application will be getting an overhaul soon
+
 # Forge Tracker
 ## The FitNotes App Gym Companion
 
